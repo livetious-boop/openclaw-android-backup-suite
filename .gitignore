@@ -1,0 +1,21 @@
+# Build outputs
+*.pyc
+__pycache__/
+build/
+dist/
+*.spec
+*.egg-info/
+
+# Android
+.gradle/
+local.properties
+app/build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,131 @@
+name: Build Windows EXE + Android APKs
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ============================================
+  # BUILD WINDOWS .EXE
+  # ============================================
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -r windows-app/requirements.txt
+
+      - name: Build EXE
+        run: |
+          cd windows-app
+          pyinstaller --onefile --name "AndroidBackupManager" --windowed --icon=assets/icon.ico gui.py
+
+      - name: Run tests
+        run: |
+          cd windows-app
+          python test_backup_manager.py -v
+          python test_full_pipeline.py -v
+
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: AndroidBackupManager-Windows
+          path: windows-app/dist/AndroidBackupManager.exe
+          retention-days: 90
+
+  # ============================================
+  # BUILD ANDROID BACKUP SUITE APK
+  # ============================================
+  build-android-transfer:
+    name: Build Android Data Transfer APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Build APK
+        working-directory: android-app
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
+          ./gradlew assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DataTransfer-APK
+          path: android-app/app/build/outputs/apk/**/*.apk
+          retention-days: 90
+
+  # ============================================
+  # BUILD ANDROID VIRUS SCANNER APK
+  # ============================================
+  build-android-scanner:
+    name: Build Android Virus Scanner APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Build APK
+        working-directory: ../android-virus-scanner
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
+          ./gradlew assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AndroidScanner-APK
+          path: ../android-virus-scanner/app/build/outputs/apk/**/*.apk
+          retention-days: 90
+
+  # ============================================
+  # CREATE RELEASE
+  # ============================================
+  release:
+    name: Create Release
+    needs: [build-windows, build-android-transfer]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Download Windows EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: AndroidBackupManager-Windows
+
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: DataTransfer-APK
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Android Backup Suite v${{ github.run_number }}
+          files: |
+            AndroidBackupManager.exe
+            *.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
