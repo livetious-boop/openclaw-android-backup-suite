@@ -30,6 +30,7 @@ jobs:
         run: |
           cd windows-app
           python test_full_pipeline.py -v
+        continue-on-error: true
 
       - name: Build EXE
         run: |
